@@ -19,10 +19,11 @@ const localeCaseInsensitive = Intl.Collator(undefined, {sensitivity: 'accent'});
 // Describes how an emote matches against a given input
 // Higher values represent a more exact match
 const NO_MATCH = 0;
-const SUBSTRING_MATCH = 1;
-const NON_PREFIX_MATCH = 2;
-const CASE_INSENSITIVE_PREFIX_MATCH = 3;
-const EXACT_PREFIX_MATCH = 4;
+const NON_SEQUENTIAL_MATCH = 1;
+const SUBSTRING_MATCH = 2;
+const NON_PREFIX_MATCH = 3;
+const CASE_INSENSITIVE_PREFIX_MATCH = 4;
+const EXACT_PREFIX_MATCH = 5;
 
 function getNodeText(node) {
 	if ( ! node )
@@ -833,6 +834,17 @@ export default class Input extends Module {
 			if (emote_lower.includes(term_lower))
 				return SUBSTRING_MATCH;
 
+			let matched_chars = 0;
+			for (emote_index in emote_lower)
+			{
+				if (emote_lower[emote_index] == term_lower[matched_chars])
+				{
+					++matched_chars;
+					if (matched_chars == term_lower.length)
+						return NON_SEQUENTIAL_MATCH;
+				}
+			}
+
 			return NO_MATCH;
 		}
 
@@ -1035,6 +1047,7 @@ export default class Input extends Module {
 		const results_usage = [],
 			results_starting = [],
 			results_other = [],
+			results_rough = [],
 
 			search = input.startsWith(':') ? input.slice(1) : input;
 
@@ -1050,8 +1063,9 @@ export default class Input extends Module {
 					count: this.EmoteUsageCount[emote.token] || 0,
 					match_type
 				};
-
-				if ( element.count > 0 )
+				if (match_type <= NON_SEQUENTIAL_MATCH)
+					results_rough.push(element);
+				else if ( element.count > 0 )
 					results_usage.push(element);
 				else if ( match_type > NON_PREFIX_MATCH )
 					results_starting.push(element);
@@ -1063,8 +1077,10 @@ export default class Input extends Module {
 		results_usage.sort((a,b) => b.count - a.count);
 		results_starting.sort((a,b) => locale.compare(a.replacement, b.replacement));
 		results_other.sort((a,b) => locale.compare(a.replacement, b.replacement));
+		results_rough.sort((a,b) => locale.compare(a.replacement, b.replacement));
+		results_rough.sort((a,b) => b.count - a.count);
 
-		return results_usage.concat(results_starting).concat(results_other);
+		return results_usage.concat(results_starting).concat(results_other).concat(results_rough);
 	}
 
 
